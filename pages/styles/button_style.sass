@@ -1,0 +1,22 @@
+@use './variables/colors' as colors
+
+a
+    z-index: 9999
+    button
+        position: relative
+        border: 0
+        cursor: pointer
+        border-radius: 22px
+        padding: 10px 15px
+        font-weight: 600
+        // box-shadow: inset 0px -5px 5px 0px rgba(39, 39, 39, 0.45)
+        color: colors.$black
+        // background-color: #51FF6B
+        transition: 0.2s ease-out
+        border: 2px solid #ffffff00
+
+        &:hover
+            opacity: 70%
+            box-shadow: inset 0px -5px 5px 0px rgba(39, 39, 39, 0.45)
+            color: colors.$bg2
+            border: 2px solid colors.$border

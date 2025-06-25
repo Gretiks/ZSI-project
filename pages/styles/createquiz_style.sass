@@ -1,0 +1,36 @@
+@use './variables/colors' as colors
+
+.createquiz
+    padding-top: 50px
+    display: flex
+    flex-direction: column
+    // input, select, textarea
+    //     height: min-content
+    //     border: 0
+    //     background-color: #2B2B2B
+    h1
+        margin: auto
+        text-align: center
+        margin-bottom: 30px
+    input, textarea
+        margin: auto
+        max-width: 500px
+        min-width: 400px
+        margin: 10px auto
+    &__question
+        background-color: colors.$bg2
+        margin: 30px auto
+        border-radius: 22px
+        padding: 32px
+        border: 1.5px solid colors.$border
+        display: flex
+        align-items: center
+        justify-content: space-around
+        &--box
+            display: flex
+            justify-content: center
+            flex-direction: column
+        // input, select, textarea
+        //     height: min-content
+        //     border: 0
+        //     background-color: #2B2B2B

@@ -1,0 +1,39 @@
+// @import '%PUBLIC_URL%/../variables/colors.sass'
+// @use './variables/colors' as colors
+
+.hero
+    width: 100%
+    height: calc(100vh - env(safe-area-inset-top))
+    // padding-top: 20px
+    // padding-top: 20px
+.bg-gradient
+    // background: #040404
+    // background: radial-gradient(193.34% 155.87% at 50% -1.55%, rgba(0, 0, 0, 0.7) 19.23%, rgba(146, 141, 211, 0.7) 100%), #000000
+    min-height: calc(100vh - env(safe-area-inset-top))
+    padding-top: 20px
+    background: radial-gradient(100% 100% at 50% 0%, #4e44e6 0%, rgba(14, 7, 108, 0) 54.33%)
+    // filter: blur(20px)
+    border-radius: 21px
+    z-index: -1
+.heroContent
+    display: flex
+    justify-content: center
+    align-items: center
+    flex-direction: column
+    &__text
+        padding: 85px 0
+        // margin-bottom: 54px
+        flex-direction: column
+        justify-content: center
+        display: flex
+        align-items: center
+        // min-height: 470px
+        min-height: 70vh
+        h1
+            font-size: 90px
+            // font-size: calc(10px + 6vh)
+            text-align: center
+            margin-bottom: 35px
+            @media screen and (max-width: 991.98px)
+                word-spacing: 0px
+                font-size: calc(10px + 10vw)

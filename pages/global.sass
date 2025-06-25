@@ -1,0 +1,76 @@
+@use './styles/variables/colors' as colors
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap')
+
+*, *::before, *::after
+    box-sizing: border-box
+
+*
+    margin: 0
+    color: colors.$colorText
+
+@media (prefers-reduced-motion: no-preference)
+html
+    interpolate-size: allow-keywords
+
+body
+    background-color: colors.$black
+    font-family: 'Roboto', sans-serif
+    line-height: 1.5
+    -webkit-font-smoothing: antialiased
+
+img, picture, video, canvas, svg
+    display: block
+    max-width: 100%
+
+input, button, textarea, select
+    font: inherit
+
+p, h1, h2, h3, h4, h5, h6
+    overflow-wrap: break-word
+
+p
+    text-wrap: pretty
+    color: colors.$grey
+
+h1, h2, h3, h4, h5, h6
+    text-wrap: balance
+
+a
+    text-decoration: none
+    background: none
+    outline: none
+    cursor: pointer
+
+input, textarea, select
+    padding: 0.5em 1em
+    border: 2px solid colors.$border
+    border-radius: 22px
+    // border: 0
+    background-color: #2B2B2B
+
+    // background: colors.$black
+    color: colors.$colorText
+    outline: none
+    transition: 0.2s ease-out
+    margin: 6px
+    // &:focus
+    padding: 12px 9px
+    &::placeholder
+        text-align: center
+    &:hover
+        border: 2px solid colors.$grey
+        box-shadow: rgba(230, 230, 230, 0.158) 0px 2px 8px 0px
+        &::placeholder
+            color: rgba(colors.$colorText , 20%)
+
+#root, #__next
+    isolation: isolate
+
+.width
+    padding-top: 20px
+
+    max-width: 90%
+    width: 1310px
+    margin: auto
+    @media (max-width: 991.98px)
+        max-width: 95%

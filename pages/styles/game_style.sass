@@ -1,0 +1,33 @@
+@use './variables/colors' as colors
+
+.game
+    min-height: 80vh
+    display: flex
+    flex-direction: column
+    justify-content: center
+    p
+        font-size: 30px
+    ul
+        margin: 25px 0
+        li
+            background-color: colors.$bg2
+            margin: 10px 0
+            padding: 10px
+            border: 1.5px solid colors.$border
+            borderRadius: 5
+            cursor: pointer
+            border-radius: 22px
+            transition: 0.2s ease-out
+            font-size: 24px
+            &:hover
+                box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px
+                // border
+
+.result
+    min-height: 80vh
+    display: flex
+    flex-direction: column
+    justify-content: center
+    align-items: center
+    p
+        margin-bottom: 12px

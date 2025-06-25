@@ -1,0 +1,44 @@
+@use './variables/colors' as colors
+
+.quizzes
+    padding-top: 50px
+    min-height: 80vh
+    &__popup
+        text-align: center
+        background-color: colors.$bg2
+        position: fixed
+        top: 50%
+        left: 50%
+        transform: translate(-50%,-50%)
+        border-radius: 22px
+        padding: 32px
+        border: 1.5px solid colors.$border
+        display: flex
+        flex-direction: column
+        h2
+            margin-bottom: 12px
+    button
+        margin: 12px 12px 0 0
+    h1
+        text-align: center
+    &__boxes
+        margin-top: 30px
+        display: flex
+        justify-content: space-around
+        &--box
+            width: 30%
+            border: 1.5px solid colors.$border
+            border-radius: 22px
+            background-color: colors.$bg2
+            padding: 32px
+            transition: 0.2s ease-out
+            cursor: pointer
+            &:hover
+                box-shadow: rgba(0, 0, 0, 0.25) 0px 14px 28px, rgba(0, 0, 0, 0.22) 0px 10px 10px
+            //     background-color: colors.$border
+            p
+                margin: 7px 0
+
+.dashboardButtons
+    button
+        margin-right: 12px

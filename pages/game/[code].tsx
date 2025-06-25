@@ -1,14 +1,15 @@
+// pages/game/[code].tsx
+
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Footer from "@/components/footer";
 import NavBar from "@/components/navbar/navbar";
 import Button from "@/components/Reusable/Button";
 
+// Interfejsy opisujące strukturę danych
 interface Answer {
   id: number;
   text: string;
-  is_correct: boolean;
-  question_id: number;
 }
 
 interface Question {
@@ -34,10 +35,22 @@ interface UserAnswers {
   [questionId: number]: number;
 }
 
+interface PlayerScore {
+  username: string;
+  score: number;
+}
+
+interface ResultData {
+  score: number;
+  total: number;
+  otherScores: PlayerScore[];
+}
+
 const GamePage: React.FC = () => {
   const router = useRouter();
   const { code } = router.query;
 
+  // Stany komponentu
   const [game, setGame] = useState<GameData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,31 +60,37 @@ const GamePage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [result, setResult] = useState<{ score: number; total: number } | null>(
-    null
-  );
+  const [result, setResult] = useState<ResultData | null>(null);
   const [sendingResult, setSendingResult] = useState(false);
 
-  const timeStringToSeconds = (timeStr: string | null) => {
-    if (!timeStr) return 30;
+  // Funkcja pomocnicza do konwersji czasu
+  const timeStringToSeconds = (timeStr: string | null): number => {
+    if (!timeStr) return 30; // Domyślny czas
     const parts = timeStr.split(":").map(Number);
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
     if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 1) return parts[0];
-    return 30;
+    return parts[0] || 30;
   };
 
+  // Efekt do pobierania danych gry
   useEffect(() => {
-    if (!code) return;
+    if (!code || typeof code !== 'string') return;
 
     const fetchGameByCode = async () => {
+      setLoading(true);
       try {
         const response = await fetch(`/api/quiz/${code}`);
-        if (!response.ok) throw new Error("Nie znaleziono gry");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Nie znaleziono gry o podanym kodzie.");
+        }
         const data: GameData = await response.json();
+        if (!data.questions || data.questions.length === 0) {
+          throw new Error("Ten quiz nie ma żadnych pytań.");
+        }
         setGame(data);
-      } catch {
-        setError("Nie udało się załadować gry.");
+      } catch (err: any) {
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -80,8 +99,9 @@ const GamePage: React.FC = () => {
     fetchGameByCode();
   }, [code]);
 
+  // Efekt do zarządzania timerem pytania
   useEffect(() => {
-    if (!game) return;
+    if (!game || result) return; // Nie uruchamiaj timera, jeśli gra się skończyła
     if (currentQuestionIndex >= game.questions.length) return;
 
     const currentQuestion = game.questions[currentQuestionIndex];
@@ -104,10 +124,10 @@ const GamePage: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [game, currentQuestionIndex]);
+  }, [game, currentQuestionIndex, result]);
 
   const handleAnswerSelect = (answerId: number) => {
-    if (!game) return;
+    if (!game || result) return;
     const questionId = game.questions[currentQuestionIndex].id;
     setUserAnswers((prev) => ({
       ...prev,
@@ -116,22 +136,25 @@ const GamePage: React.FC = () => {
   };
 
   const handleNext = () => {
-    if (!game) return;
+    if (!game || result) return;
     if (currentQuestionIndex < game.questions.length - 1) {
       setCurrentQuestionIndex((idx) => idx + 1);
     } else {
-      sendResults();
+      if (!sendingResult) {
+        sendResults();
+      }
     }
   };
 
   const sendResults = async () => {
-    if (!game) return;
+    if (!game || sendingResult) return;
 
     setSendingResult(true);
+    if (timerRef.current) clearInterval(timerRef.current); // Zatrzymaj timer po zakończeniu
 
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("Brak tokena");
+      if (!token) throw new Error("Brak autoryzacji. Zaloguj się, aby zapisać wynik.");
 
       const answersArray = Object.entries(userAnswers).map(
         ([questionId, answerId]) => ({
@@ -149,39 +172,92 @@ const GamePage: React.FC = () => {
         body: JSON.stringify({ answers: answersArray }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Brak autoryzacji. Zaloguj się ponownie.");
-        }
-        throw new Error("Błąd podczas wysyłania odpowiedzi");
+        throw new Error(data.error || "Wystąpił nieznany błąd podczas wysyłania odpowiedzi.");
       }
 
-      const data = await response.json();
-      setResult({ score: data.score, total: game.questions.length });
+      setResult({
+        score: data.score,
+        total: game.questions.length,
+        otherScores: data.otherScores || [],
+      });
     } catch (err: any) {
-      setError(err.message || "Błąd podczas wysyłania wyników.");
+      setError(err.message);
     } finally {
       setSendingResult(false);
     }
   };
 
-  if (loading) return <p>Ładowanie gry...</p>;
-  if (error) return <p className="error">{error}</p>;
-  if (!game) return <p>Brak danych gry</p>;
+  // Widok ładowania
+  if (loading) {
+    return <div className="centered-message">Ładowanie gry...</div>;
+  }
+  
+  // Widok błędu
+  if (error) {
+    return (
+      <div className="bg-gradient">
+        <div className="width">
+          <NavBar />
+          <div className="result">
+            <h1>Wystąpił błąd</h1>
+            <p className="error-message">{error}</p>
+            <Button onClick={() => router.push("/dashboard")} text="Powrót do panelu" />
+          </div>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
 
+  // Widok pustej gry
+  if (!game) {
+    return <div className="centered-message">Nie udało się załadować danych gry.</div>;
+  }
+
+  // Widok wyników
   if (result) {
     return (
       <div className="bg-gradient">
         <div className="width">
           <NavBar />
           <div className="result">
-            <h1>Wynik</h1>
-            <p>
+            <h1>Quiz zakończony!</h1>
+            <h2 className="your-score">
               Twój wynik: {result.score} / {result.total}
-            </p>
+            </h2>
+
+            <div className="leaderboard">
+              <h3>Tabela wyników</h3>
+              {result.otherScores.length > 0 ? (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Miejsce</th>
+                      <th>Gracz</th>
+                      <th>Wynik</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.otherScores.map((player, index) => (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>{player.username}</td>
+                        <td>{player.score} / {result.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p>Jesteś pierwszym graczem, który ukończył ten quiz!</p>
+              )}
+            </div>
+            
             <Button
               onClick={() => router.push("/dashboard")}
-              text="Powrót do listy gier"
+              text="Powrót do panelu"
+              margin="20px 0 0 0"
             />
           </div>
           <Footer />
@@ -190,62 +266,51 @@ const GamePage: React.FC = () => {
     );
   }
 
-  if (currentQuestionIndex >= game.questions.length) {
-    return <p>Trwa wysyłanie wyników...</p>;
+  // Widok wysyłania wyników
+  if (sendingResult) {
+    return <div className="centered-message">Zapisywanie wyniku...</div>;
   }
-
+  
   const currentQuestion = game.questions[currentQuestionIndex];
   const selectedAnswerId = userAnswers[currentQuestion.id];
 
+  // Główny widok gry
   return (
     <div className="bg-gradient">
       <div className="width">
         <NavBar />
         <div className="game">
-          <h1>{game.quiz.title}</h1>
-          <div>
-            <p>{currentQuestion.text}</p>
-            <p>Czas do końca: {timeLeft}s</p>
-            <h3>
-              Pytanie {currentQuestionIndex + 1} / {game.questions.length}
-            </h3>
-            <ul style={{ listStyle: "none", padding: 0 }}>
+          <div className="game-header">
+            <h1>{game.quiz.title}</h1>
+            <div className="game-info">
+              <span>Pytanie {currentQuestionIndex + 1} / {game.questions.length}</span>
+              <span className="timer">Pozostały czas: {timeLeft}s</span>
+            </div>
+          </div>
+          
+          <div className="question-container">
+            <p className="question-text">{currentQuestion.text}</p>
+            <ul className="answers-list">
               {currentQuestion.answers.map((answer) => (
                 <li
                   key={answer.id}
                   onClick={() => handleAnswerSelect(answer.id)}
-                  style={{
-                    backgroundColor:
-                      selectedAnswerId === answer.id ? "#18471f" : "",
-
-                    color: selectedAnswerId === answer.id ? "white" : "",
-                  }}
+                  className={selectedAnswerId === answer.id ? "selected" : ""}
                 >
                   {answer.text}
                 </li>
               ))}
             </ul>
-
-            <Button
-              text={
-                currentQuestionIndex === game.questions.length - 1
-                  ? "Zakończ"
-                  : "Następne"
-              }
-              margin="10px 0 0 0"
-              bgColor={
-                selectedAnswerId === undefined || sendingResult
-                  ? "#ccc"
-                  : undefined
-              }
-              onClick={(e) => {
-                e.preventDefault();
-                if (selectedAnswerId !== undefined && !sendingResult) {
-                  handleNext();
-                }
-              }}
-            />
           </div>
+
+          <Button
+            text={
+              currentQuestionIndex === game.questions.length - 1
+                ? "Zakończ i zobacz wyniki"
+                : "Następne pytanie"
+            }
+            onClick={handleNext}
+          />
         </div>
         <Footer />
       </div>

@@ -74,3 +74,35 @@ input, textarea, select
     margin: auto
     @media (max-width: 991.98px)
         max-width: 95%
+
+input[type="radio"], input[type="checkbox"]
+    appearance: none
+    width: 28px
+    border: 2px solid colors.$border
+    border-radius: 50%
+    background-color: #2B2B2B
+    position: relative
+    transition: border-color 0.2s, box-shadow 0.2s
+    // display: flex
+    cursor: pointer
+    &:checked
+        // display: flex
+        border-color: colors.$grey
+        box-shadow: 0 0 0 4px rgba(colors.$grey, 0.15)
+        &::before
+            content: ''
+            display: block
+            width: 10px
+            height: 10px
+            border-radius: 50%
+            background: colors.$grey
+            position: absolute
+            transform: translate(-50%,-50%)
+            left: 50%
+
+    &:focus
+        outline: none
+        box-shadow: 0 0 0 3px rgba(colors.$grey, 0.25)
+
+    &:hover
+        border-color: colors.$grey

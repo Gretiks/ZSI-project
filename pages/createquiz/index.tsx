@@ -177,6 +177,9 @@ const CreateQuiz = () => {
         setCategory("");
         setDescription("");
         setQuestions([]);
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 500);
       }
     } catch (error) {
       setMessage("Coś poszło nie tak podczas zapisu");
@@ -242,12 +245,8 @@ const CreateQuiz = () => {
                 <option value="t/f">Prawda / Fałsz</option>
               </select>
             </div>
-            {/* Pole time_limit */}
-            <div className="mb-4 flex items-center space-x-2">
-              <label
-                className="text-sm font-medium text-gray-700"
-                htmlFor={`time_limit-${qIdx}`}
-              >
+            <div>
+              <label htmlFor={`time_limit-${qIdx}`}>
                 Limit czasu (sekundy):
               </label>
               <input
@@ -268,9 +267,9 @@ const CreateQuiz = () => {
               />
             </div>
 
-            <div className="space-y-2">
+            <div>
               {q.answers.map((a, aIdx) => (
-                <div key={aIdx} className="flex items-center space-x-2">
+                <div key={aIdx} className="answers">
                   {q.type === "one" || q.type === "t/f" ? (
                     <input
                       type="radio"

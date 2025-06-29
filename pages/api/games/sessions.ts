@@ -27,21 +27,20 @@ export default async function handler(
 
     const [rows] = await connection.query(
       `
-      SELECT 
-        s.code, 
-        q.id,
-        q.title, 
-        q.category,
-        q.description,
-        q.created_at,
-        q.updated_at,
-        q.access,
-        q.author
-      FROM session s
-      JOIN quizzes q ON s.quiz_id = q.id
-      JOIN users u ON s.user_id = u.id
-    
-      `,
+  SELECT 
+    s.code, 
+    s.id as session_id,
+    q.title, 
+    q.category,
+    q.description,
+    q.created_at,
+    q.updated_at,
+    q.access,
+    u.username AS author -- autor sesji zamiast autora quizu
+  FROM session s
+  JOIN quizzes q ON s.quiz_id = q.id
+  JOIN users u ON s.user_id = u.id
+  `,
       [username]
     );
 

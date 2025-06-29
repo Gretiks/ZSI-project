@@ -1,21 +1,20 @@
-// pages/game/[code].tsx
-
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Footer from "@/components/footer";
 import NavBar from "@/components/navbar/navbar";
 import Button from "@/components/Reusable/Button";
 
-// Interfejsy opisujące strukturę danych
 interface Answer {
   id: number;
   text: string;
+  is_correct: boolean;
+  question_id: number;
 }
 
 interface Question {
   id: number;
   text: string;
-  type: string;
+  type: string; // e.g. "single", "multi"
   time_limit: string | null;
   answers: Answer[];
 }
@@ -24,6 +23,7 @@ interface Quiz {
   id: number;
   title: string;
   description: string;
+  code: string;
 }
 
 interface GameData {
@@ -32,25 +32,19 @@ interface GameData {
 }
 
 interface UserAnswers {
-  [questionId: number]: number;
+  [questionId: number]: number[];
 }
 
-interface PlayerScore {
+interface LeaderboardEntry {
   username: string;
   score: number;
-}
-
-interface ResultData {
-  score: number;
-  total: number;
-  otherScores: PlayerScore[];
+  created_at: string;
 }
 
 const GamePage: React.FC = () => {
   const router = useRouter();
   const { code } = router.query;
 
-  // Stany komponentu
   const [game, setGame] = useState<GameData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,37 +54,32 @@ const GamePage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [result, setResult] = useState<ResultData | null>(null);
+  const [result, setResult] = useState<{ score: number; total: number } | null>(
+    null
+  );
   const [sendingResult, setSendingResult] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
-  // Funkcja pomocnicza do konwersji czasu
-  const timeStringToSeconds = (timeStr: string | null): number => {
-    if (!timeStr) return 30; // Domyślny czas
+  const timeStringToSeconds = (timeStr: string | null) => {
+    if (!timeStr) return 30;
     const parts = timeStr.split(":").map(Number);
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
     if (parts.length === 2) return parts[0] * 60 + parts[1];
-    return parts[0] || 30;
+    if (parts.length === 1) return parts[0];
+    return 30;
   };
 
-  // Efekt do pobierania danych gry
   useEffect(() => {
-    if (!code || typeof code !== 'string') return;
+    if (!code) return;
 
     const fetchGameByCode = async () => {
-      setLoading(true);
       try {
         const response = await fetch(`/api/quiz/${code}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Nie znaleziono gry o podanym kodzie.");
-        }
+        if (!response.ok) throw new Error("Nie znaleziono gry");
         const data: GameData = await response.json();
-        if (!data.questions || data.questions.length === 0) {
-          throw new Error("Ten quiz nie ma żadnych pytań.");
-        }
         setGame(data);
-      } catch (err: any) {
-        setError(err.message);
+      } catch {
+        setError("Nie udało się załadować gry.");
       } finally {
         setLoading(false);
       }
@@ -99,9 +88,8 @@ const GamePage: React.FC = () => {
     fetchGameByCode();
   }, [code]);
 
-  // Efekt do zarządzania timerem pytania
   useEffect(() => {
-    if (!game || result) return; // Nie uruchamiaj timera, jeśli gra się skończyła
+    if (!game) return;
     if (currentQuestionIndex >= game.questions.length) return;
 
     const currentQuestion = game.questions[currentQuestionIndex];
@@ -124,43 +112,56 @@ const GamePage: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [game, currentQuestionIndex, result]);
+  }, [game, currentQuestionIndex]);
 
   const handleAnswerSelect = (answerId: number) => {
-    if (!game || result) return;
-    const questionId = game.questions[currentQuestionIndex].id;
-    setUserAnswers((prev) => ({
-      ...prev,
-      [questionId]: answerId,
-    }));
+    if (!game) return;
+    const question = game.questions[currentQuestionIndex];
+    const questionId = question.id;
+
+    setUserAnswers((prev) => {
+      const existing = prev[questionId] || [];
+
+      if (question.type === "multi") {
+        return {
+          ...prev,
+          [questionId]: existing.includes(answerId)
+            ? existing.filter((id) => id !== answerId)
+            : [...existing, answerId],
+        };
+      } else {
+        return {
+          ...prev,
+          [questionId]: [answerId],
+        };
+      }
+    });
   };
 
   const handleNext = () => {
-    if (!game || result) return;
+    if (!game) return;
     if (currentQuestionIndex < game.questions.length - 1) {
       setCurrentQuestionIndex((idx) => idx + 1);
     } else {
-      if (!sendingResult) {
-        sendResults();
-      }
+      sendResults();
     }
   };
 
   const sendResults = async () => {
-    if (!game || sendingResult) return;
+    if (!game) return;
 
     setSendingResult(true);
-    if (timerRef.current) clearInterval(timerRef.current); // Zatrzymaj timer po zakończeniu
 
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("Brak autoryzacji. Zaloguj się, aby zapisać wynik.");
+      if (!token) throw new Error("Brak tokena");
 
-      const answersArray = Object.entries(userAnswers).map(
-        ([questionId, answerId]) => ({
-          question_id: Number(questionId),
-          answer_id: answerId,
-        })
+      const answersArray = Object.entries(userAnswers).flatMap(
+        ([questionId, answerIds]) =>
+          (answerIds as number[]).map((answerId) => ({
+            question_id: Number(questionId),
+            answer_id: answerId,
+          }))
       );
 
       const response = await fetch(`/api/quiz/${code}/submit`, {
@@ -172,93 +173,84 @@ const GamePage: React.FC = () => {
         body: JSON.stringify({ answers: answersArray }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Wystąpił nieznany błąd podczas wysyłania odpowiedzi.");
+        if (response.status === 401) {
+          throw new Error("Brak autoryzacji. Zaloguj się ponownie.");
+        }
+        throw new Error("Błąd podczas wysyłania odpowiedzi");
       }
 
-      setResult({
-        score: data.score,
-        total: game.questions.length,
-        otherScores: data.otherScores || [],
-      });
+      const data = await response.json();
+      setResult({ score: data.score, total: game.questions.length });
+      fetchLeaderboard();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Błąd podczas wysyłania wyników.");
     } finally {
       setSendingResult(false);
     }
   };
 
-  // Widok ładowania
-  if (loading) {
-    return <div className="centered-message">Ładowanie gry...</div>;
-  }
-  
-  // Widok błędu
-  if (error) {
-    return (
-      <div className="bg-gradient">
-        <div className="width">
-          <NavBar />
-          <div className="result">
-            <h1>Wystąpił błąd</h1>
-            <p className="error-message">{error}</p>
-            <Button onClick={() => router.push("/dashboard")} text="Powrót do panelu" />
-          </div>
-          <Footer />
-        </div>
-      </div>
-    );
-  }
+  const fetchLeaderboard = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Brak tokena autoryzacyjnego");
 
-  // Widok pustej gry
-  if (!game) {
-    return <div className="centered-message">Nie udało się załadować danych gry.</div>;
-  }
+      const res = await fetch(`/api/quiz/${code}/results`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  // Widok wyników
+      if (!res.ok) throw new Error("Nie udało się pobrać wyników");
+
+      const data: LeaderboardEntry[] = await res.json();
+      setLeaderboard(data);
+    } catch (err) {
+      console.error("Błąd leaderboarda:", err);
+    }
+  };
+
+  if (loading) return <p>Ładowanie gry...</p>;
+  if (error) return <p className="error">{error}</p>;
+  if (!game) return <p>Brak danych gry</p>;
+
   if (result) {
     return (
       <div className="bg-gradient">
         <div className="width">
           <NavBar />
           <div className="result">
-            <h1>Quiz zakończony!</h1>
-            <h2 className="your-score">
+            <h1>Wynik</h1>
+            <p>
               Twój wynik: {result.score} / {result.total}
-            </h2>
-
-            <div className="leaderboard">
-              <h3>Tabela wyników</h3>
-              {result.otherScores.length > 0 ? (
+            </p>
+            <Button
+              onClick={() => router.push("/dashboard")}
+              text="Powrót do listy gier"
+            />
+            {leaderboard.length > 0 && (
+              <div className="leaderboard" style={{ marginTop: "30px" }}>
+                <h2>Wyniki innych graczy</h2>
                 <table>
                   <thead>
                     <tr>
-                      <th>Miejsce</th>
                       <th>Gracz</th>
                       <th>Wynik</th>
+                      <th>Data</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {result.otherScores.map((player, index) => (
+                    {leaderboard.map((entry, index) => (
                       <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{player.username}</td>
-                        <td>{player.score} / {result.total}</td>
+                        <td>{entry.username}</td>
+                        <td>{entry.score}</td>
+                        <td>{new Date(entry.created_at).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              ) : (
-                <p>Jesteś pierwszym graczem, który ukończył ten quiz!</p>
-              )}
-            </div>
-            
-            <Button
-              onClick={() => router.push("/dashboard")}
-              text="Powrót do panelu"
-              margin="20px 0 0 0"
-            />
+              </div>
+            )}
           </div>
           <Footer />
         </div>
@@ -266,51 +258,67 @@ const GamePage: React.FC = () => {
     );
   }
 
-  // Widok wysyłania wyników
-  if (sendingResult) {
-    return <div className="centered-message">Zapisywanie wyniku...</div>;
+  if (currentQuestionIndex >= game.questions.length) {
+    return <p>Trwa wysyłanie wyników...</p>;
   }
-  
-  const currentQuestion = game.questions[currentQuestionIndex];
-  const selectedAnswerId = userAnswers[currentQuestion.id];
 
-  // Główny widok gry
+  const currentQuestion = game.questions[currentQuestionIndex];
+  const selectedAnswers = userAnswers[currentQuestion.id] || [];
+
   return (
     <div className="bg-gradient">
       <div className="width">
         <NavBar />
         <div className="game">
-          <div className="game-header">
-            <h1>{game.quiz.title}</h1>
-            <div className="game-info">
-              <span>Pytanie {currentQuestionIndex + 1} / {game.questions.length}</span>
-              <span className="timer">Pozostały czas: {timeLeft}s</span>
-            </div>
-          </div>
-          
-          <div className="question-container">
-            <p className="question-text">{currentQuestion.text}</p>
-            <ul className="answers-list">
+          <h1>{game.quiz.title}</h1>
+          <div>
+            <p>{currentQuestion.text}</p>
+            <p>Czas do końca: {timeLeft}s</p>
+            <h3>
+              Pytanie {currentQuestionIndex + 1} / {game.questions.length}
+            </h3>
+            <ul style={{ listStyle: "none", padding: 0 }}>
               {currentQuestion.answers.map((answer) => (
                 <li
                   key={answer.id}
                   onClick={() => handleAnswerSelect(answer.id)}
-                  className={selectedAnswerId === answer.id ? "selected" : ""}
+                  style={{
+                    backgroundColor: selectedAnswers.includes(answer.id)
+                      ? "#18471f"
+                      : "",
+                    color: selectedAnswers.includes(answer.id) ? "white" : "",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    marginBottom: "5px",
+                    border: "1px solid #ccc",
+                  }}
                 >
                   {answer.text}
                 </li>
               ))}
             </ul>
-          </div>
 
-          <Button
-            text={
-              currentQuestionIndex === game.questions.length - 1
-                ? "Zakończ i zobacz wyniki"
-                : "Następne pytanie"
-            }
-            onClick={handleNext}
-          />
+            <Button
+              text={
+                currentQuestionIndex === game.questions.length - 1
+                  ? "Zakończ"
+                  : "Następne"
+              }
+              margin="10px 0 0 0"
+              bgColor={
+                selectedAnswers.length === 0 || sendingResult
+                  ? "#ccc"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                if (selectedAnswers.length > 0 && !sendingResult) {
+                  handleNext();
+                }
+              }}
+            />
+          </div>
         </div>
         <Footer />
       </div>

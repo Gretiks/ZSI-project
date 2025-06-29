@@ -71,7 +71,7 @@ const RegisterForm = () => {
           id="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="E-mail"
+          placeholder="Imię"
           required
         />
         <Button text="Zarejestruj się" />

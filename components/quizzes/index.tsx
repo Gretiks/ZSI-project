@@ -5,7 +5,7 @@ import PopUp from "../popup";
 
 interface Game {
   id?: number; // Quiz ID
-  session_id?: number; // Session ID
+  session_id?: string; // Session ID
   code?: string;
   title: string;
   description: string;
@@ -45,6 +45,11 @@ const Quizzes: React.FC<QuizzesProps> = ({ status }) => {
         setGames(data);
       } catch (err) {
         setError("Nie udało się pobrać gier. Zaloguj się ponownie.");
+        localStorage.removeItem("token");
+
+        setTimeout(() => {
+          router.push("/auth");
+        }, 5000);
       } finally {
         setLoading(false);
       }
@@ -52,6 +57,49 @@ const Quizzes: React.FC<QuizzesProps> = ({ status }) => {
 
     fetchData();
   }, [status]);
+  const handleDeleteGame = async (game: Game, isSession: boolean) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Musisz się zalogować");
+      return;
+    }
+
+    const gameId = game.code || game.id;
+    console.log(gameId);
+    if (!gameId) {
+      alert("Nieprawidłowe ID gry");
+      return;
+    }
+
+    if (
+      !confirm(`Czy na pewno chcesz usunąć tę ${isSession ? "sesję" : "grę"}?`)
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/games/delete", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ gameId, isSession }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Błąd podczas usuwania");
+      }
+
+      // Po usunięciu odśwież listę gier/sesji
+      setGames((prevGames) =>
+        prevGames.filter((g) => (g.code || g.id) !== gameId)
+      );
+    } catch (error: any) {
+      alert(`Nie udało się usunąć: ${error.message}`);
+    }
+  };
 
   const handleSubmitCode = async (code: string) => {
     const token = localStorage.getItem("token");
@@ -108,8 +156,9 @@ const Quizzes: React.FC<QuizzesProps> = ({ status }) => {
           games.map((game) => (
             <div
               className="quizzes__boxes--box"
-              key={game.session_id || game.id || game.code}
+              key={game.id || game.session_id}
             >
+              {/* {status ? game.session_id : game.id} */}
               <h2>{game.title}</h2>
               {status && game.code && <h3>Kod gry: {game.code}</h3>}
               <p>{game.description}</p>
@@ -127,7 +176,7 @@ const Quizzes: React.FC<QuizzesProps> = ({ status }) => {
                   <Button
                     text="Usuń grę"
                     font="15px"
-                    onClick={() => handleJoinGame(game.code)}
+                    onClick={() => handleDeleteGame(game, true)} // usuwanie sesji
                     bgColor="#FAF5F5"
                   />
                 </>
@@ -140,9 +189,11 @@ const Quizzes: React.FC<QuizzesProps> = ({ status }) => {
                     bgColor="#FAF5F5"
                   />
                   <Button
-                    text="Usuń grę"
+                    text="Usuń quizz"
                     font="15px"
-                    onClick={() => handleJoinGame(game.code)}
+                    onClick={() => {
+                      handleDeleteGame(game, false), console.log(game);
+                    }} // usuwanie quizu
                     bgColor="#FAF5F5"
                   />
                 </>
